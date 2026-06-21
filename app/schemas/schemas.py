@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -29,6 +30,24 @@ class ArticleOut(BaseModel):
 
 
 class GenerateResponse(BaseModel):
+    """Kept from Task 1 (no longer used by /generate, available for reuse)."""
+
     article_id: int
     title: str
     status: str
+
+
+# ---------------------------------------------------------------------------
+# Added in Task 2: Celery task tracking
+# ---------------------------------------------------------------------------
+
+
+class TaskQueuedResponse(BaseModel):
+    task_id: str
+    status: str = "queued"
+
+
+class TaskStatusResponse(BaseModel):
+    task_id: str
+    state: str
+    result: Any | None = None

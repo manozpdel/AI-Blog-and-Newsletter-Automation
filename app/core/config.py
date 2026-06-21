@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str
     LLM_MODEL: str = "llama-3.3-70b-versatile"
 
+    # --- Added in Task 2: Celery (RabbitMQ broker, Redis result backend) ---
+    CELERY_BROKER_URL: str
+    CELERY_RESULT_BACKEND: str
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
