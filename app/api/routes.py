@@ -1,11 +1,24 @@
+from celery import chain
+from celery.result import AsyncResult
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.models.models import Article, ArticleStatus, Topic
-from app.schemas.schemas import ArticleOut, GenerateResponse, TopicCreate, TopicOut
-from app.services.llm_service import generate_article_content
+from app.schemas.schemas import (
+    ArticleOut,
+    TaskQueuedResponse,
+    TaskStatusResponse,
+    TopicCreate,
+    TopicOut,
+)
+from app.tasks.content_tasks import (
+    generate_article_task,
+    generate_outline_task,
+    generate_title_task,
+)
+from app.workers.celery_app import celery_app
 
 router = APIRouter()
 
@@ -25,37 +38,56 @@ async def list_topics(db: AsyncSession = Depends(get_db)):
     return result.scalars().all()
 
 
-@router.post("/generate/{topic_id}", response_model=GenerateResponse, tags=["generate"])
+@router.post("/generate/{topic_id}", response_model=TaskQueuedResponse, tags=["generate"])
 async def generate_article(topic_id: int, db: AsyncSession = Depends(get_db)):
     """
-    Synchronous article generation (no Celery yet):
+    Task 2: article generation now runs in the background via Celery.
+
     1. Validate topic exists
-    2. Call LLM service
-    3. Persist article in PostgreSQL
+    2. Create an Article row with status PENDING
+    3. Dispatch a Celery chain: generate_title -> generate_outline -> generate_article
+    4. Return the task_id immediately (no waiting for the LLM)
     """
     topic = await db.get(Topic, topic_id)
     if topic is None:
         raise HTTPException(status_code=404, detail="Topic not found")
 
-    article = Article(topic_id=topic.id, status=ArticleStatus.PROCESSING.value)
+    article = Article(topic_id=topic.id, status=ArticleStatus.PENDING.value)
     db.add(article)
     await db.commit()
     await db.refresh(article)
 
-    try:
-        generated = await generate_article_content(topic=topic.name, tone=topic.tone)
-    except Exception as exc:
-        article.status = ArticleStatus.FAILED.value
-        await db.commit()
-        raise HTTPException(status_code=502, detail=f"LLM generation failed: {exc}") from exc
+    workflow = chain(
+        generate_title_task.s(article.id, topic.id),
+        generate_outline_task.s(),
+        generate_article_task.s(),
+    )
+    async_result = workflow.apply_async()
 
-    article.title = generated["title"]
-    article.content = generated["article"]
-    article.status = ArticleStatus.COMPLETED.value
-    await db.commit()
-    await db.refresh(article)
+    return TaskQueuedResponse(task_id=async_result.id, status="queued")
 
-    return GenerateResponse(article_id=article.id, title=article.title, status=article.status)
+
+@router.get("/tasks/{task_id}", response_model=TaskStatusResponse, tags=["tasks"])
+async def get_task_status(task_id: str):
+    """
+    Check the state of a Celery task by id.
+
+    state: PENDING / STARTED / SUCCESS / FAILURE
+    result: present once the task has finished (success result or error message)
+    """
+    async_result = AsyncResult(task_id, app=celery_app)
+
+    result_payload = None
+    if async_result.state == "SUCCESS":
+        result_payload = async_result.result
+    elif async_result.state == "FAILURE":
+        result_payload = str(async_result.result)
+
+    return TaskStatusResponse(
+        task_id=task_id,
+        state=async_result.state,
+        result=result_payload,
+    )
 
 
 @router.get("/articles", response_model=list[ArticleOut], tags=["articles"])

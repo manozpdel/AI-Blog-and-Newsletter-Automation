@@ -19,6 +19,11 @@ def _get_llm(temperature: float = 0.7) -> ChatGroq:
     )
 
 
+# ---------------------------------------------------------------------------
+# Task 1: single combined call (kept as-is, unused by the new Celery chain
+# but left in place since it's working code and may still be reused).
+# ---------------------------------------------------------------------------
+
 _PROMPT = ChatPromptTemplate.from_messages(
     [
         (
@@ -65,7 +70,7 @@ def _parse_llm_output(raw_text: str) -> dict:
 async def generate_article_content(topic: str, tone: str) -> dict:
     """
     Generate title + outline + full article in a SINGLE LLM call
-    using LangChain's Groq integration (no multi-step pipeline yet).
+    using LangChain's Groq integration. Kept from Task 1.
 
     Returns:
         {"title": str, "outline": str, "article": str}
@@ -75,3 +80,79 @@ async def generate_article_content(topic: str, tone: str) -> dict:
 
     raw_output = await chain.ainvoke({"topic": topic, "tone": tone})
     return _parse_llm_output(raw_output)
+
+
+# ---------------------------------------------------------------------------
+# Task 2: granular steps used by the Celery chain
+# (generate_title -> generate_outline -> generate_article)
+# ---------------------------------------------------------------------------
+
+_TITLE_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            "You are an expert blog editor who writes catchy, click-worthy titles.",
+        ),
+        (
+            "human",
+            "Generate ONE catchy blog title for the topic below. "
+            "Respond with ONLY the title text, nothing else, no quotes.\n\n"
+            "Topic: {topic}\nTone: {tone}",
+        ),
+    ]
+)
+
+_OUTLINE_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            "You are an expert content strategist who writes clear, well-structured "
+            "article outlines.",
+        ),
+        (
+            "human",
+            "Create a bullet-point outline (4-6 points) for a blog article.\n\n"
+            "Title: {title}\nTopic: {topic}\nTone: {tone}\n\n"
+            "Respond with ONLY the bullet points, one per line, each starting with '-'.",
+        ),
+    ]
+)
+
+_ARTICLE_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            "You are an expert content writer and SEO copywriter.",
+        ),
+        (
+            "human",
+            "Write the full blog article in markdown, at least 400 words, matching "
+            "the requested tone, following the outline closely.\n\n"
+            "Title: {title}\nTopic: {topic}\nTone: {tone}\nOutline:\n{outline}\n\n"
+            "Respond with ONLY the article body (no title heading repetition needed).",
+        ),
+    ]
+)
+
+
+async def generate_title(topic: str, tone: str) -> str:
+    llm = _get_llm()
+    chain = _TITLE_PROMPT | llm | StrOutputParser()
+    result = await chain.ainvoke({"topic": topic, "tone": tone})
+    return result.strip().strip('"')
+
+
+async def generate_outline(topic: str, tone: str, title: str) -> str:
+    llm = _get_llm()
+    chain = _OUTLINE_PROMPT | llm | StrOutputParser()
+    result = await chain.ainvoke({"topic": topic, "tone": tone, "title": title})
+    return result.strip()
+
+
+async def generate_full_article(topic: str, tone: str, title: str, outline: str) -> str:
+    llm = _get_llm()
+    chain = _ARTICLE_PROMPT | llm | StrOutputParser()
+    result = await chain.ainvoke(
+        {"topic": topic, "tone": tone, "title": title, "outline": outline}
+    )
+    return result.strip()
