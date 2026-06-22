@@ -46,3 +46,8 @@ class Article(Base):
     )
 
     topic: Mapped["Topic"] = relationship(back_populates="articles")
+
+    # Added in Task 3
+    newsletters: Mapped[list["Newsletter"]] = relationship(
+        back_populates="article", cascade="all, delete-orphan"
+    )

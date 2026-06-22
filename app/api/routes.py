@@ -6,13 +6,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.models.models import Article, ArticleStatus, Topic
+from app.models.newsletter import Newsletter
 from app.schemas.schemas import (
     ArticleOut,
+    GenerateNewsletterResponse,
+    NewsletterOut,
     TaskQueuedResponse,
     TaskStatusResponse,
     TopicCreate,
     TopicOut,
 )
+from app.services.llm_service import generate_newsletter_summary
 from app.tasks.content_tasks import (
     generate_article_task,
     generate_outline_task,
@@ -41,12 +45,7 @@ async def list_topics(db: AsyncSession = Depends(get_db)):
 @router.post("/generate/{topic_id}", response_model=TaskQueuedResponse, tags=["generate"])
 async def generate_article(topic_id: int, db: AsyncSession = Depends(get_db)):
     """
-    Task 2: article generation now runs in the background via Celery.
-
-    1. Validate topic exists
-    2. Create an Article row with status PENDING
-    3. Dispatch a Celery chain: generate_title -> generate_outline -> generate_article
-    4. Return the task_id immediately (no waiting for the LLM)
+    Background article generation via Celery chain (unchanged from Task 2).
     """
     topic = await db.get(Topic, topic_id)
     if topic is None:
@@ -69,12 +68,6 @@ async def generate_article(topic_id: int, db: AsyncSession = Depends(get_db)):
 
 @router.get("/tasks/{task_id}", response_model=TaskStatusResponse, tags=["tasks"])
 async def get_task_status(task_id: str):
-    """
-    Check the state of a Celery task by id.
-
-    state: PENDING / STARTED / SUCCESS / FAILURE
-    result: present once the task has finished (success result or error message)
-    """
     async_result = AsyncResult(task_id, app=celery_app)
 
     result_payload = None
@@ -102,3 +95,51 @@ async def get_article(article_id: int, db: AsyncSession = Depends(get_db)):
     if article is None:
         raise HTTPException(status_code=404, detail="Article not found")
     return article
+
+
+# ---------------------------------------------------------------------------
+# Added in Task 3: Newsletters
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/generate-newsletter/{article_id}",
+    response_model=GenerateNewsletterResponse,
+    tags=["newsletters"],
+)
+async def generate_newsletter(article_id: int, db: AsyncSession = Depends(get_db)):
+    """
+    On-demand newsletter generation for an existing (already-generated) article.
+    Synchronous, single LLM call -- the article content already exists, so there's
+    no need to queue this through Celery.
+    """
+    article = await db.get(Article, article_id)
+    if article is None:
+        raise HTTPException(status_code=404, detail="Article not found")
+    if not article.content:
+        raise HTTPException(status_code=400, detail="Article has no content yet")
+
+    summary = await generate_newsletter_summary(title=article.title or "", article=article.content)
+
+    newsletter = Newsletter(article_id=article.id, content=summary)
+    db.add(newsletter)
+    await db.commit()
+    await db.refresh(newsletter)
+
+    return GenerateNewsletterResponse(
+        newsletter_id=newsletter.id, article_id=article.id, content=newsletter.content
+    )
+
+
+@router.get("/newsletters", response_model=list[NewsletterOut], tags=["newsletters"])
+async def list_newsletters(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Newsletter).order_by(Newsletter.id.desc()))
+    return result.scalars().all()
+
+
+@router.get("/newsletters/{newsletter_id}", response_model=NewsletterOut, tags=["newsletters"])
+async def get_newsletter(newsletter_id: int, db: AsyncSession = Depends(get_db)):
+    newsletter = await db.get(Newsletter, newsletter_id)
+    if newsletter is None:
+        raise HTTPException(status_code=404, detail="Newsletter not found")
+    return newsletter
