@@ -1,86 +1,94 @@
-import asyncio
 from typing import Any
 
-from app.db.session import AsyncSessionLocal
+from app.db.session import SyncSessionLocal
 from app.models.models import Article, ArticleStatus, Topic
+from app.workers.celery_app import celery_app
+
+# LangChain calls are async — we still need one small event loop bridge
+import asyncio
+
+
+def _run(coro):
+    return asyncio.run(coro)
+
+
+def _get_topic(topic_id: int) -> Topic:
+    with SyncSessionLocal() as db:
+        topic = db.get(Topic, topic_id)
+        if topic is None:
+            raise ValueError(f"Topic {topic_id} not found")
+        # Read values out before session closes
+        name = topic.name
+        tone = topic.tone
+    return name, tone
+
+
+def _update_article(article_id: int, **fields: Any) -> None:
+    with SyncSessionLocal() as db:
+        article = db.get(Article, article_id)
+        if article is None:
+            return
+        for key, value in fields.items():
+            setattr(article, key, value)
+        db.commit()
+
+
+def _mark_failed(article_id: int) -> None:
+    _update_article(article_id, status=ArticleStatus.FAILED.value)
+
+
+# Import LLM functions here (they are async, we bridge with _run)
 from app.services.llm_service import (
     generate_full_article,
     generate_outline,
     generate_title,
 )
-from app.workers.celery_app import celery_app
-
-
-def _run_async(coro):
-    """Bridge: run an async coroutine to completion from inside a sync Celery task."""
-    return asyncio.run(coro)
-
-
-async def _load_topic(topic_id: int) -> Topic:
-    async with AsyncSessionLocal() as db:
-        topic = await db.get(Topic, topic_id)
-        if topic is None:
-            raise ValueError(f"Topic {topic_id} not found")
-        return topic
-
-
-async def _update_article(article_id: int, **fields: Any) -> None:
-    async with AsyncSessionLocal() as db:
-        article = await db.get(Article, article_id)
-        if article is None:
-            return
-        for key, value in fields.items():
-            setattr(article, key, value)
-        await db.commit()
-
-
-async def _mark_failed(article_id: int) -> None:
-    await _update_article(article_id, status=ArticleStatus.FAILED.value)
 
 
 @celery_app.task(name="content.generate_title", bind=True)
 def generate_title_task(self, article_id: int, topic_id: int) -> dict:
-    """Step 1 of the chain: fetch topic, generate title, mark article PROCESSING."""
     try:
-        topic = _run_async(_load_topic(topic_id))
-        _run_async(_update_article(article_id, status=ArticleStatus.PROCESSING.value))
+        topic_name, tone = _get_topic(topic_id)
+        _update_article(article_id, status=ArticleStatus.PROCESSING.value)
 
-        title = _run_async(generate_title(topic=topic.name, tone=topic.tone))
-        _run_async(_update_article(article_id, title=title))
+        title = _run(generate_title(topic=topic_name, tone=tone))
+        _update_article(article_id, title=title)
 
         return {
             "article_id": article_id,
             "topic_id": topic_id,
-            "topic_name": topic.name,
-            "tone": topic.tone,
+            "topic_name": topic_name,
+            "tone": tone,
             "title": title,
         }
     except Exception:
-        _run_async(_mark_failed(article_id))
+        _mark_failed(article_id)
         raise
 
 
 @celery_app.task(name="content.generate_outline", bind=True)
 def generate_outline_task(self, prev: dict) -> dict:
-    """Step 2 of the chain: generate outline from the title produced in step 1."""
     article_id = prev["article_id"]
     try:
-        outline = _run_async(
-            generate_outline(topic=prev["topic_name"], tone=prev["tone"], title=prev["title"])
+        outline = _run(
+            generate_outline(
+                topic=prev["topic_name"],
+                tone=prev["tone"],
+                title=prev["title"],
+            )
         )
         prev["outline"] = outline
         return prev
     except Exception:
-        _run_async(_mark_failed(article_id))
+        _mark_failed(article_id)
         raise
 
 
 @celery_app.task(name="content.generate_article", bind=True)
 def generate_article_task(self, prev: dict) -> dict:
-    """Step 3 of the chain: generate full article, persist it, mark COMPLETED."""
     article_id = prev["article_id"]
     try:
-        content = _run_async(
+        content = _run(
             generate_full_article(
                 topic=prev["topic_name"],
                 tone=prev["tone"],
@@ -88,19 +96,16 @@ def generate_article_task(self, prev: dict) -> dict:
                 outline=prev["outline"],
             )
         )
-        _run_async(
-            _update_article(
-                article_id,
-                content=content,
-                status=ArticleStatus.COMPLETED.value,
-            )
+        _update_article(
+            article_id,
+            content=content,
+            status=ArticleStatus.COMPLETED.value,
         )
-
         return {
             "article_id": article_id,
             "title": prev["title"],
             "status": ArticleStatus.COMPLETED.value,
         }
     except Exception:
-        _run_async(_mark_failed(article_id))
+        _mark_failed(article_id)
         raise

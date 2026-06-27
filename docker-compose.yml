@@ -30,6 +30,31 @@ services:
       - ./app:/app/app
     restart: unless-stopped
 
+  beat:
+    build: .
+    container_name: ai-content-beat
+    command: ["uv", "run", "celery", "-A", "app.workers.celery_app", "beat", "--loglevel=info"]
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    volumes:
+      - ./app:/app/app
+    restart: unless-stopped
+
+  streamlit:
+    build: ./streamlit_app
+    container_name: ai-content-streamlit
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    depends_on:
+      - api
+    restart: unless-stopped
+
   postgres:
     image: postgres:16-alpine
     container_name: ai-content-postgres
@@ -54,8 +79,8 @@ services:
     image: rabbitmq:3-management-alpine
     container_name: ai-content-rabbitmq
     ports:
-      - "5672:5672"     # AMQP port (broker)
-      - "15672:15672"   # Management UI -> http://localhost:15672 (guest/guest)
+      - "5672:5672"
+      - "15672:15672"
     restart: unless-stopped
 
 volumes:
