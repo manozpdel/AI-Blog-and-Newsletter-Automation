@@ -37,11 +37,6 @@ class GenerateResponse(BaseModel):
     status: str
 
 
-# ---------------------------------------------------------------------------
-# Added in Task 2: Celery task tracking
-# ---------------------------------------------------------------------------
-
-
 class TaskQueuedResponse(BaseModel):
     task_id: str
     status: str = "queued"
@@ -51,3 +46,23 @@ class TaskStatusResponse(BaseModel):
     task_id: str
     state: str
     result: Any | None = None
+
+
+# ---------------------------------------------------------------------------
+# Added in Task 3: Newsletters
+# ---------------------------------------------------------------------------
+
+
+class NewsletterOut(BaseModel):
+    id: int
+    article_id: int
+    content: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class GenerateNewsletterResponse(BaseModel):
+    newsletter_id: int
+    article_id: int
+    content: str

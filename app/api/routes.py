@@ -65,6 +65,9 @@ async def list_topics(db: AsyncSession = Depends(get_db)):
 
 @router.post("/generate/{topic_id}", response_model=TaskQueuedResponse, tags=["generate"])
 async def generate_article(topic_id: int, db: AsyncSession = Depends(get_db)):
+    """
+    Background article generation via Celery chain (unchanged from Task 2).
+    """
     topic = await db.get(Topic, topic_id)
     if topic is None:
         raise HTTPException(status_code=404, detail="Topic not found")
@@ -143,7 +146,7 @@ async def get_article(article_id: int, db: AsyncSession = Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
-# Newsletters (unchanged from Task 3)
+# Added in Task 3: Newsletters
 # ---------------------------------------------------------------------------
 
 
@@ -153,6 +156,11 @@ async def get_article(article_id: int, db: AsyncSession = Depends(get_db)):
     tags=["newsletters"],
 )
 async def generate_newsletter(article_id: int, db: AsyncSession = Depends(get_db)):
+    """
+    On-demand newsletter generation for an existing (already-generated) article.
+    Synchronous, single LLM call -- the article content already exists, so there's
+    no need to queue this through Celery.
+    """
     article = await db.get(Article, article_id)
     if article is None:
         raise HTTPException(status_code=404, detail="Article not found")
