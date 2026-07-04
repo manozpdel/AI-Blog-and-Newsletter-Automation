@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 
@@ -21,17 +21,15 @@ def _get_newsletter_sync(newsletter_id: int) -> dict:
         article = newsletter.article
         return {
             "id": newsletter.id,
-            "summary": newsletter.content,           
-            "article_content": article.content,       
+            "summary": newsletter.content,
+            "article_content": article.content,
             "article_title": article.title or "AI Newsletter",
         }
 
 
 def _get_active_subscribers_sync() -> list[dict]:
     with SyncSessionLocal() as db:
-        result = db.execute(
-            select(Subscriber).where(Subscriber.is_active == True)  # noqa: E712
-        )
+        result = db.execute(select(Subscriber).where(Subscriber.is_active == True))  # noqa: E712
         subscribers = result.scalars().all()
         return [{"id": s.id, "name": s.name, "email": s.email} for s in subscribers]
 
@@ -65,10 +63,8 @@ def _update_email_log_sync(
         if error_message:
             log.error_message = error_message
         if status == EmailStatus.SENT:
-            log.sent_at = datetime.now(timezone.utc)
+            log.sent_at = datetime.now(UTC)
         db.commit()
-
-
 
 
 @celery_app.task(name="email.dispatch_newsletter", queue="email_queue", bind=True)
@@ -92,7 +88,7 @@ def dispatch_newsletter_emails(self, newsletter_id: int) -> dict:
                 "subscriber_email": subscriber["email"],
                 "article_title": newsletter["article_title"],
                 "newsletter_summary": newsletter["summary"],
-                "article_content": newsletter["article_content"],   # ← full article
+                "article_content": newsletter["article_content"],  # ← full article
             },
             queue="email_queue",
         )
@@ -100,8 +96,6 @@ def dispatch_newsletter_emails(self, newsletter_id: int) -> dict:
 
     logger.info(f"Queued {queued} email tasks for newsletter {newsletter_id}")
     return {"newsletter_id": newsletter_id, "queued": queued}
-
-
 
 
 @celery_app.task(
@@ -121,7 +115,7 @@ def send_newsletter_to_subscriber(
     subscriber_email: str,
     article_title: str,
     newsletter_summary: str,
-    article_content: str,        # ← renamed/new param
+    article_content: str,  # ← renamed/new param
 ) -> dict:
     _update_email_log_sync(
         log_id, EmailStatus.RETRYING if self.request.retries > 0 else EmailStatus.PENDING
@@ -131,7 +125,7 @@ def send_newsletter_to_subscriber(
         html = render_email_html(
             title=article_title,
             summary=newsletter_summary,
-            content=article_content,     # ← full article goes here now
+            content=article_content,  # ← full article goes here now
             subscriber_name=subscriber_name,
         )
         message_id = send_email(
@@ -144,11 +138,11 @@ def send_newsletter_to_subscriber(
         return {"log_id": log_id, "subscriber_email": subscriber_email, "status": EmailStatus.SENT}
 
     except Exception as exc:
-        logger.warning(f"Email to {subscriber_email} failed (attempt {self.request.retries + 1}): {exc}")
+        logger.warning(
+            f"Email to {subscriber_email} failed (attempt {self.request.retries + 1}): {exc}"
+        )
         _update_email_log_sync(log_id, EmailStatus.FAILED, error_message=str(exc))
         raise
-
-
 
 
 @celery_app.task(name="email.retry_failed", queue="email_queue", bind=True)

@@ -48,8 +48,6 @@ class TaskStatusResponse(BaseModel):
     result: Any | None = None
 
 
-
-
 class NewsletterOut(BaseModel):
     id: int
     article_id: int

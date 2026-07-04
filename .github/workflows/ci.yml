@@ -1,0 +1,135 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/**"
+  pull_request:
+    branches:
+      - main
+      - "feature/**"
+
+# Cancel any in-progress run for the same branch when a newer commit is pushed.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ──────────────────────────────────────────────────────────────
+  # Job 1: Install + Lint + Format + Type check + Tests
+  # ──────────────────────────────────────────────────────────────
+  quality:
+    name: Code Quality & Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      # 1. Checkout
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Install uv
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      # 3. Set up Python
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 4. Cache uv dependencies
+      - name: Cache uv dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: uv-${{ runner.os }}-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-
+
+      # 5. Install project dependencies
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      # 6. Ruff — linting
+      - name: Lint with Ruff
+        run: uv run ruff check .
+
+      # 7. Black — formatting check
+      - name: Check formatting with Black
+        run: uv run black --check .
+
+      # 8. MyPy — type checking
+      - name: Type check with MyPy
+        run: uv run mypy app
+
+      # 9. Pytest — run all tests
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379/0
+          GROQ_API_KEY: dummy_key_for_tests
+          LLM_MODEL: llama-3.3-70b-versatile
+          CELERY_BROKER_URL: amqp://guest:guest@localhost:5672//
+          CELERY_RESULT_BACKEND: redis://localhost:6379/0
+          SMTP_HOST: smtp.gmail.com
+          SMTP_PORT: "587"
+          SMTP_USERNAME: test@example.com
+          SMTP_PASSWORD: testpassword
+          EMAIL_FROM: test@example.com
+          SMTP_USE_TLS: "true"
+        run: |
+          uv run pytest tests/ \
+            --tb=short \
+            --no-header \
+            -q \
+            --junit-xml=test-results.xml
+
+      # Publish test results as GitHub Actions summary
+      - name: Publish test summary
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: test-results.xml
+
+  # ──────────────────────────────────────────────────────────────
+  # Job 2: Docker build verification
+  # ──────────────────────────────────────────────────────────────
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Only run Docker build after quality checks pass
+    needs: quality
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Verify Docker Compose builds
+        run: docker compose build --no-cache
+        env:
+          # Provide dummy values so config.py does not fail at import time
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/ai_content_db
+          REDIS_URL: redis://redis:6379/0
+          GROQ_API_KEY: dummy
+          LLM_MODEL: llama-3.3-70b-versatile
+          CELERY_BROKER_URL: amqp://guest:guest@rabbitmq:5672//
+          CELERY_RESULT_BACKEND: redis://redis:6379/0
+          SMTP_HOST: smtp.gmail.com
+          SMTP_PORT: "587"
+          SMTP_USERNAME: test@example.com
+          SMTP_PASSWORD: testpassword
+          EMAIL_FROM: test@example.com
+          SMTP_USE_TLS: "true"

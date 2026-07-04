@@ -1,23 +1,26 @@
+# LangChain calls are async — we still need one small event loop bridge
+import asyncio
 from typing import Any
 
 from app.db.session import SyncSessionLocal
 from app.models.models import Article, ArticleStatus, Topic
+from app.services.llm_service import (
+    generate_full_article,
+    generate_outline,
+    generate_title,
+)
 from app.workers.celery_app import celery_app
-
-# LangChain calls are async — we still need one small event loop bridge
-import asyncio
 
 
 def _run(coro):
     return asyncio.run(coro)
 
 
-def _get_topic(topic_id: int) -> Topic:
+def _get_topic(topic_id: int) -> tuple[str, str]:
     with SyncSessionLocal() as db:
         topic = db.get(Topic, topic_id)
         if topic is None:
             raise ValueError(f"Topic {topic_id} not found")
-        # Read values out before session closes
         name = topic.name
         tone = topic.tone
     return name, tone
@@ -35,14 +38,6 @@ def _update_article(article_id: int, **fields: Any) -> None:
 
 def _mark_failed(article_id: int) -> None:
     _update_article(article_id, status=ArticleStatus.FAILED.value)
-
-
-# Import LLM functions here (they are async, we bridge with _run)
-from app.services.llm_service import (
-    generate_full_article,
-    generate_outline,
-    generate_title,
-)
 
 
 @celery_app.task(name="content.generate_title", bind=True)
