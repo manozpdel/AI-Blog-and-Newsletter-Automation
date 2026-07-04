@@ -22,7 +22,7 @@ class ContentState(TypedDict):
 
 def _get_llm(temperature: float = 0.7) -> ChatGroq:
     return ChatGroq(
-        api_key=settings.GROQ_API_KEY,# type: ignore[arg-type]
+        api_key=settings.GROQ_API_KEY,  # type: ignore[arg-type]
         model=settings.LLM_MODEL,
         temperature=temperature,
     )
