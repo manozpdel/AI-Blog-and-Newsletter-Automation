@@ -48,9 +48,6 @@ class TaskStatusResponse(BaseModel):
     result: Any | None = None
 
 
-# ---------------------------------------------------------------------------
-# Added in Task 3: Newsletters
-# ---------------------------------------------------------------------------
 
 
 class NewsletterOut(BaseModel):

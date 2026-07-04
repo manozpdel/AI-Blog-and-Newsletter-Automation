@@ -20,7 +20,7 @@ def _get_llm(temperature: float = 0.7) -> ChatGroq:
 
 
 # ---------------------------------------------------------------------------
-# Task 1: single combined call (kept as-is)
+# Task 1: single combined call 
 # ---------------------------------------------------------------------------
 
 _PROMPT = ChatPromptTemplate.from_messages(
@@ -78,7 +78,7 @@ async def generate_article_content(topic: str, tone: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Task 2: granular steps used by the Celery chain (kept as-is)
+# Task 2: granular steps used by the Celery chain 
 # ---------------------------------------------------------------------------
 
 _TITLE_PROMPT = ChatPromptTemplate.from_messages(
