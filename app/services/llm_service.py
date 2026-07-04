@@ -13,14 +13,14 @@ def _get_llm(temperature: float = 0.7) -> ChatGroq:
     (.env), per project requirements -- never hardcoded.
     """
     return ChatGroq(
-        api_key=settings.GROQ_API_KEY,
+        api_key=settings.GROQ_API_KEY,# type: ignore[arg-type]
         model=settings.LLM_MODEL,
         temperature=temperature,
     )
 
 
 # ---------------------------------------------------------------------------
-# Task 1: single combined call 
+# Task 1: single combined call
 # ---------------------------------------------------------------------------
 
 _PROMPT = ChatPromptTemplate.from_messages(
@@ -78,7 +78,7 @@ async def generate_article_content(topic: str, tone: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Task 2: granular steps used by the Celery chain 
+# Task 2: granular steps used by the Celery chain
 # ---------------------------------------------------------------------------
 
 _TITLE_PROMPT = ChatPromptTemplate.from_messages(
@@ -140,9 +140,7 @@ async def generate_outline(topic: str, tone: str, title: str) -> str:
 async def generate_full_article(topic: str, tone: str, title: str, outline: str) -> str:
     llm = _get_llm()
     chain = _ARTICLE_PROMPT | llm | StrOutputParser()
-    result = await chain.ainvoke(
-        {"topic": topic, "tone": tone, "title": title, "outline": outline}
-    )
+    result = await chain.ainvoke({"topic": topic, "tone": tone, "title": title, "outline": outline})
     return result.strip()
 
 

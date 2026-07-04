@@ -1,13 +1,19 @@
+from __future__ import annotations
+
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
+if TYPE_CHECKING:
+    from app.models.newsletter import Newsletter
 
-class ArticleStatus(str, Enum):
+
+class ArticleStatus(StrEnum):
     PENDING = "PENDING"
     PROCESSING = "PROCESSING"
     COMPLETED = "COMPLETED"
@@ -20,11 +26,9 @@ class Topic(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     tone: Mapped[str] = mapped_column(String(100), nullable=False, default="neutral")
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    articles: Mapped[list["Article"]] = relationship(
+    articles: Mapped[list[Article]] = relationship(
         back_populates="topic", cascade="all, delete-orphan"
     )
 
@@ -41,13 +45,11 @@ class Article(Base):
     status: Mapped[str] = mapped_column(
         String(50), nullable=False, default=ArticleStatus.PENDING.value
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    topic: Mapped["Topic"] = relationship(back_populates="articles")
+    topic: Mapped[Topic] = relationship(back_populates="articles")
 
     # Added in Task 3
-    newsletters: Mapped[list["Newsletter"]] = relationship(
+    newsletters: Mapped[list[Newsletter]] = relationship(
         back_populates="article", cascade="all, delete-orphan"
     )

@@ -44,8 +44,8 @@ def send_email(
     """
     msg = EmailMessage()
     msg["Subject"] = subject
-    msg["From"]    = settings.EMAIL_FROM
-    msg["To"]      = f"{to_name} <{to_email}>"
+    msg["From"] = settings.EMAIL_FROM
+    msg["To"] = f"{to_name} <{to_email}>"
     msg.set_content("Please use an HTML-capable email client.")
     msg.add_alternative(html_body, subtype="html")
 

@@ -10,7 +10,7 @@ celery_app = Celery(
     include=[
         "app.tasks.content_tasks",
         "app.tasks.scheduled_tasks",
-        "app.tasks.email_tasks",   # Added in Task 5
+        "app.tasks.email_tasks",  # Added in Task 5
     ],
 )
 
@@ -25,7 +25,7 @@ celery_app.conf.update(
     # Task 5: dedicated queues
     task_routes={
         "content.*": {"queue": "content_queue"},
-        "email.*":   {"queue": "email_queue"},
+        "email.*": {"queue": "email_queue"},
     },
 )
 

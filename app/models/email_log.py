@@ -1,9 +1,15 @@
+from __future__ import annotations
+
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+if TYPE_CHECKING:
+    from app.models.subscriber import Subscriber
 
 
 class EmailStatus:
@@ -33,4 +39,4 @@ class EmailLog(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
-    subscriber: Mapped["Subscriber"] = relationship(back_populates="email_logs")  # noqa: F821
+    subscriber: Mapped[Subscriber] = relationship(back_populates="email_logs")

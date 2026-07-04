@@ -15,8 +15,6 @@ class Newsletter(Base):
         ForeignKey("articles.id", ondelete="CASCADE"), nullable=False, index=True
     )
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     article: Mapped["Article"] = relationship(back_populates="newsletters")

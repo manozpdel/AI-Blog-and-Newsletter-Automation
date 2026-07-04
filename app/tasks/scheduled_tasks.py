@@ -46,7 +46,7 @@ async def _process_topic(topic: Topic) -> dict:
         return {"topic_id": topic.id, "skipped": True, "reason": "already generated today"}
 
     pipeline_result = await run_content_pipeline(topic=topic.name, tone=topic.tone)
-    newsletter_id = await _store_article_and_newsletter(topic.id, pipeline_result)
+    newsletter_id = await _store_article_and_newsletter(topic.id, pipeline_result)  # type: ignore[arg-type]
     await mark_generated_today(topic.name)
 
     return {"topic_id": topic.id, "newsletter_id": newsletter_id, "skipped": False}

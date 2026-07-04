@@ -4,7 +4,7 @@ import io
 from celery import chain
 from celery.result import AsyncResult
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.rate_limit import rate_limit
@@ -105,12 +105,12 @@ async def generate_article(topic_id: int, db: AsyncSession = Depends(get_db)):
 async def get_task_stats():
     inspect = celery_app.control.inspect(timeout=2)
     try:
-        active_raw    = inspect.active()    or {}
+        active_raw = inspect.active() or {}
         scheduled_raw = inspect.scheduled() or {}
-        reserved_raw  = inspect.reserved()  or {}
-        active    = sum(len(v) for v in active_raw.values())
+        reserved_raw = inspect.reserved() or {}
+        active = sum(len(v) for v in active_raw.values())
         scheduled = sum(len(v) for v in scheduled_raw.values())
-        reserved  = sum(len(v) for v in reserved_raw.values())
+        reserved = sum(len(v) for v in reserved_raw.values())
     except Exception:
         active = scheduled = reserved = 0
     return {"active": active, "scheduled": scheduled, "reserved": reserved, "failed": 0}
@@ -169,18 +169,14 @@ async def generate_newsletter(article_id: int, db: AsyncSession = Depends(get_db
     if not article.content:
         raise HTTPException(status_code=400, detail="Article has no content yet")
 
-    summary = await generate_newsletter_summary(
-        title=article.title or "", article=article.content
-    )
+    summary = await generate_newsletter_summary(title=article.title or "", article=article.content)
     newsletter = Newsletter(article_id=article.id, content=summary)
     db.add(newsletter)
     await db.commit()
     await db.refresh(newsletter)
 
     # Automatically kick off email delivery to all active subscribers
-    dispatch_newsletter_emails.apply_async(
-        args=[newsletter.id], queue="email_queue"
-    )
+    dispatch_newsletter_emails.apply_async(args=[newsletter.id], queue="email_queue")
 
     return GenerateNewsletterResponse(
         newsletter_id=newsletter.id, article_id=article.id, content=newsletter.content
@@ -202,15 +198,13 @@ async def get_newsletter(newsletter_id: int, db: AsyncSession = Depends(get_db))
 
 
 # ---------------------------------------------------------------------------
-# Subscribers  
+# Subscribers
 # ---------------------------------------------------------------------------
 
 
 @router.post("/subscribers", response_model=SubscriberOut, status_code=201, tags=["subscribers"])
 async def create_subscriber(payload: SubscriberCreate, db: AsyncSession = Depends(get_db)):
-    existing = await db.execute(
-        select(Subscriber).where(Subscriber.email == payload.email)
-    )
+    existing = await db.execute(select(Subscriber).where(Subscriber.email == payload.email))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Email already subscribed")
     subscriber = Subscriber(name=payload.name, email=payload.email, is_active=payload.is_active)
@@ -292,7 +286,7 @@ async def import_subscribers(file: UploadFile = File(...), db: AsyncSession = De
 
 
 # ---------------------------------------------------------------------------
-# Email logs + statistics  
+# Email logs + statistics
 # ---------------------------------------------------------------------------
 
 
@@ -303,13 +297,9 @@ async def list_email_logs(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/email/logs/{newsletter_id}", response_model=list[EmailLogOut], tags=["email"])
-async def get_email_logs_for_newsletter(
-    newsletter_id: int, db: AsyncSession = Depends(get_db)
-):
+async def get_email_logs_for_newsletter(newsletter_id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
-        select(EmailLog)
-        .where(EmailLog.newsletter_id == newsletter_id)
-        .order_by(EmailLog.id.desc())
+        select(EmailLog).where(EmailLog.newsletter_id == newsletter_id).order_by(EmailLog.id.desc())
     )
     return result.scalars().all()
 
@@ -319,10 +309,12 @@ async def get_email_statistics(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(EmailLog))
     logs = result.scalars().all()
 
-    total     = len(logs)
-    delivered = sum(1 for l in logs if l.status == EmailStatus.SENT)
-    failed    = sum(1 for l in logs if l.status == EmailStatus.FAILED)
-    pending   = sum(1 for l in logs if l.status in (EmailStatus.PENDING, EmailStatus.RETRYING))
+    total = len(logs)
+    delivered = sum(1 for log in logs if log.status == EmailStatus.SENT)
+
+    failed = sum(1 for log in logs if log.status == EmailStatus.FAILED)
+
+    pending = sum(1 for log in logs if log.status in (EmailStatus.PENDING, EmailStatus.RETRYING))
     success_pct = round((delivered / total * 100), 2) if total > 0 else 0.0
 
     return EmailStatistics(
@@ -337,5 +329,6 @@ async def get_email_statistics(db: AsyncSession = Depends(get_db)):
 @router.post("/email/retry/{newsletter_id}", tags=["email"])
 async def retry_failed_emails(newsletter_id: int):
     from app.tasks.email_tasks import retry_failed_emails as retry_task
+
     result = retry_task.apply_async(args=[newsletter_id], queue="email_queue")
     return {"task_id": result.id, "status": "queued"}

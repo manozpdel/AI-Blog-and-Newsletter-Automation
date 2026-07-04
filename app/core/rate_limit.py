@@ -7,8 +7,8 @@ from app.core.config import settings
 
 _redis = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
 
-RATE_LIMIT = 100       # requests
-WINDOW_SECONDS = 60    # per minute
+RATE_LIMIT = 100  # requests
+WINDOW_SECONDS = 60  # per minute
 
 
 async def rate_limit(request: Request) -> None:

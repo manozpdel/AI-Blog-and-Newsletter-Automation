@@ -1,4 +1,4 @@
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import (
@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
 
@@ -33,9 +33,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 # Sync engine — used by Celery tasks only
 # Converts  postgresql+asyncpg://  ->  postgresql+psycopg2://
 # ---------------------------------------------------------------------------
-_sync_url = settings.DATABASE_URL.replace(
-    "postgresql+asyncpg://", "postgresql+psycopg2://"
-)
+_sync_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
 
 sync_engine = create_engine(_sync_url, pool_pre_ping=True)
 

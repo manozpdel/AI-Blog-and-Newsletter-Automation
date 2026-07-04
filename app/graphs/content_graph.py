@@ -22,7 +22,7 @@ class ContentState(TypedDict):
 
 def _get_llm(temperature: float = 0.7) -> ChatGroq:
     return ChatGroq(
-        api_key=settings.GROQ_API_KEY,
+        api_key=settings.GROQ_API_KEY,# type: ignore[arg-type]
         model=settings.LLM_MODEL,
         temperature=temperature,
     )
@@ -140,9 +140,7 @@ async def newsletter_node(state: ContentState) -> dict:
         ]
     )
     chain = prompt | llm | StrOutputParser()
-    newsletter = await chain.ainvoke(
-        {"title": state["title"], "article": state["article"][:2000]}
-    )
+    newsletter = await chain.ainvoke({"title": state["title"], "article": state["article"][:2000]})
     return {"newsletter": newsletter.strip()}
 
 
