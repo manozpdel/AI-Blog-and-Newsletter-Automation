@@ -151,7 +151,7 @@ async def get_article(article_id: int, db: AsyncSession = Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
-# Newsletters  (trigger email dispatch after saving — Task 5)
+# Newsletters  (trigger email dispatch after saving )
 # ---------------------------------------------------------------------------
 
 
@@ -202,7 +202,7 @@ async def get_newsletter(newsletter_id: int, db: AsyncSession = Depends(get_db))
 
 
 # ---------------------------------------------------------------------------
-# Subscribers  (new in Task 5)
+# Subscribers  
 # ---------------------------------------------------------------------------
 
 
@@ -292,7 +292,7 @@ async def import_subscribers(file: UploadFile = File(...), db: AsyncSession = De
 
 
 # ---------------------------------------------------------------------------
-# Email logs + statistics  (new in Task 5)
+# Email logs + statistics  
 # ---------------------------------------------------------------------------
 
 

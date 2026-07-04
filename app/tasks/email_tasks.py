@@ -69,9 +69,6 @@ def _update_email_log_sync(
         db.commit()
 
 
-# ---------------------------------------------------------------------------
-# Task 1: Dispatch — queues one send task per active subscriber
-# ---------------------------------------------------------------------------
 
 
 @celery_app.task(name="email.dispatch_newsletter", queue="email_queue", bind=True)
@@ -105,9 +102,6 @@ def dispatch_newsletter_emails(self, newsletter_id: int) -> dict:
     return {"newsletter_id": newsletter_id, "queued": queued}
 
 
-# ---------------------------------------------------------------------------
-# Task 2: Send — sends exactly one email, retries on failure
-# ---------------------------------------------------------------------------
 
 
 @celery_app.task(
@@ -155,9 +149,6 @@ def send_newsletter_to_subscriber(
         raise
 
 
-# ---------------------------------------------------------------------------
-# Task 3: Retry failed emails for a specific newsletter
-# ---------------------------------------------------------------------------
 
 
 @celery_app.task(name="email.retry_failed", queue="email_queue", bind=True)
