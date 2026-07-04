@@ -29,14 +29,10 @@ class EmailLog(Base):
     newsletter_id: Mapped[int] = mapped_column(
         ForeignKey("newsletters.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    status: Mapped[str] = mapped_column(
-        String(50), nullable=False, default=EmailStatus.PENDING
-    )
+    status: Mapped[str] = mapped_column(String(50), nullable=False, default=EmailStatus.PENDING)
     provider_message_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     subscriber: Mapped[Subscriber] = relationship(back_populates="email_logs")
