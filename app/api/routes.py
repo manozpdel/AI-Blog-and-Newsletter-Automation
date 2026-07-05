@@ -38,17 +38,17 @@ from app.tasks.content_tasks import (
 )
 from app.workers.celery_app import celery_app
 
-router = APIRouter(dependencies=[Depends(rate_limit)])
+# ── Health — no rate limiting, no Redis dependency ────────────────────────────
+health_router = APIRouter()
 
 
-# ---------------------------------------------------------------------------
-# Health
-# ---------------------------------------------------------------------------
-
-
-@router.get("/health", tags=["health"])
+@health_router.get("/health", tags=["health"])
 async def health():
     return {"status": "ok"}
+
+
+# ── All other routes — rate limited ───────────────────────────────────────────
+router = APIRouter(dependencies=[Depends(rate_limit)])
 
 
 # ---------------------------------------------------------------------------
@@ -63,6 +63,27 @@ async def create_topic(payload: TopicCreate, db: AsyncSession = Depends(get_db))
     await db.commit()
     await db.refresh(topic)
     return topic
+
+
+@router.put("/topics/{topic_id}", response_model=TopicOut, tags=["topics"])
+async def update_topic(topic_id: int, payload: TopicCreate, db: AsyncSession = Depends(get_db)):
+    topic = await db.get(Topic, topic_id)
+    if topic is None:
+        raise HTTPException(status_code=404, detail="Topic not found")
+    topic.name = payload.name
+    topic.tone = payload.tone
+    await db.commit()
+    await db.refresh(topic)
+    return topic
+
+
+@router.delete("/topics/{topic_id}", status_code=204, tags=["topics"])
+async def delete_topic(topic_id: int, db: AsyncSession = Depends(get_db)):
+    topic = await db.get(Topic, topic_id)
+    if topic is None:
+        raise HTTPException(status_code=404, detail="Topic not found")
+    await db.delete(topic)
+    await db.commit()
 
 
 @router.get("/topics", response_model=list[TopicOut], tags=["topics"])
@@ -151,7 +172,7 @@ async def get_article(article_id: int, db: AsyncSession = Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
-# Newsletters  (trigger email dispatch after saving )
+# Newsletters
 # ---------------------------------------------------------------------------
 
 
@@ -161,7 +182,7 @@ async def get_article(article_id: int, db: AsyncSession = Depends(get_db)):
     tags=["newsletters"],
 )
 async def generate_newsletter(article_id: int, db: AsyncSession = Depends(get_db)):
-    from app.tasks.email_tasks import dispatch_newsletter_emails  # avoid circular import
+    from app.tasks.email_tasks import dispatch_newsletter_emails
 
     article = await db.get(Article, article_id)
     if article is None:
@@ -175,7 +196,6 @@ async def generate_newsletter(article_id: int, db: AsyncSession = Depends(get_db
     await db.commit()
     await db.refresh(newsletter)
 
-    # Automatically kick off email delivery to all active subscribers
     dispatch_newsletter_emails.apply_async(args=[newsletter.id], queue="email_queue")
 
     return GenerateNewsletterResponse(
@@ -253,10 +273,6 @@ async def delete_subscriber(subscriber_id: int, db: AsyncSession = Depends(get_d
 
 @router.post("/subscribers/import", response_model=CSVImportResult, tags=["subscribers"])
 async def import_subscribers(file: UploadFile = File(...), db: AsyncSession = Depends(get_db)):
-    """
-    Accept a CSV with header: name,email
-    Returns imported count, skipped (duplicate) count, and invalid rows.
-    """
     content = await file.read()
     text = content.decode("utf-8", errors="ignore")
     reader = csv.DictReader(io.StringIO(text))
@@ -311,9 +327,7 @@ async def get_email_statistics(db: AsyncSession = Depends(get_db)):
 
     total = len(logs)
     delivered = sum(1 for log in logs if log.status == EmailStatus.SENT)
-
     failed = sum(1 for log in logs if log.status == EmailStatus.FAILED)
-
     pending = sum(1 for log in logs if log.status in (EmailStatus.PENDING, EmailStatus.RETRYING))
     success_pct = round((delivered / total * 100), 2) if total > 0 else 0.0
 

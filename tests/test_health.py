@@ -7,16 +7,18 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from app.api.routes import health_router
 from app.api.routes import router as api_router
 
 
 @pytest.fixture(scope="module")
 def client():
     """
-    Build a minimal FastAPI app using the same router as production
+    Build a minimal FastAPI app using the same routers as production
     but with no lifespan (no DB connection attempt).
     """
     test_app = FastAPI()
+    test_app.include_router(health_router)
     test_app.include_router(api_router)
     with TestClient(test_app, raise_server_exceptions=False) as c:
         yield c
