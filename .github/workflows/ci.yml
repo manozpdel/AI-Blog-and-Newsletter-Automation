@@ -16,7 +16,8 @@ concurrency:
 
 permissions:
   contents: read
-  checks: write        # required by publish-unit-test-result-action
+  checks: write
+  pull-requests: write    # ← add this line
 
 jobs:
   quality:
