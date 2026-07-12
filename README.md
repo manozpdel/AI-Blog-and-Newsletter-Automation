@@ -231,7 +231,7 @@ ai-blog-newsletter-platform/
 ### Clone the repository
 
 ```bash
-git clone https://github.com/manozpdel/AI-Blog-and-Newsletter-automation-.git
+git clone https://github.com/manozpdel/AI-Blog-and-Newsletter-Automation.git
 cd ai-blog-newsletter-platform
 ```
 
