@@ -1,10 +1,26 @@
 # AI Content Automation Platform
 
-A production-style, end-to-end AI content generation and newsletter delivery platform built with FastAPI, LangGraph, LangChain, Celery, and Docker.
+<p align="center">
 
-The platform automates the full content lifecycle: it generates SEO-optimised blog articles using a multi-step LangGraph pipeline powered by Groq LLMs, summarises them into newsletter blurbs, delivers those newsletters to a managed subscriber list over SMTP, and exposes the entire system through a clean HTML/CSS admin dashboard — all orchestrated by Celery background workers and Celery Beat scheduling.
+![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi)
+![LangGraph](https://img.shields.io/badge/LangGraph-Stateful_AI-purple)
+![LangChain](https://img.shields.io/badge/LangChain-LLM_Framework-green)
+![Celery](https://img.shields.io/badge/Celery-Distributed_Tasks-brightgreen)
+![RabbitMQ](https://img.shields.io/badge/RabbitMQ-Message_Broker-orange)
+![Redis](https://img.shields.io/badge/Redis-Cache-red?logo=redis)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue?logo=postgresql)
+![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?logo=docker)
+![License](https://img.shields.io/badge/License-MIT-yellow)
 
-This project was built as a portfolio-grade demonstration of modern Python backend engineering: asynchronous FastAPI, event-driven task processing with RabbitMQ, structured logging, Redis caching, and a modular, testable architecture that follows an MVC-like separation of concerns.
+</p>
+
+A **production-grade AI Content Automation Platform** built with **FastAPI**, **LangGraph**, **LangChain**, **Celery**, **RabbitMQ**, **Redis**, **PostgreSQL**, and **Docker**.
+
+The platform automates the complete AI content lifecycle—from **SEO article generation** to **newsletter creation**, **subscriber management**, and **SMTP email delivery**—using asynchronous APIs, distributed background workers, scheduled jobs, and stateful AI workflows.
+
+Designed as a **portfolio-quality backend engineering project**, it demonstrates production-ready architecture patterns commonly used in modern AI systems.
+
 
 ---
 
