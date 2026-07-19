@@ -17,7 +17,7 @@ concurrency:
 permissions:
   contents: read
   checks: write
-  pull-requests: write    # ← add this line
+  pull-requests: write
 
 jobs:
   quality:
@@ -32,25 +32,32 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v3
         with:
-          version: "latest"
+          version: latest
 
-      - name: Set up Python 3.11
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Cache uv dependencies
+      - name: Cache uv downloads
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.cache/uv
-            .venv
-          key: uv-${{ runner.os }}-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('uv.lock') }}
           restore-keys: |
             uv-${{ runner.os }}-
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: |
+          rm -rf .venv
+          uv sync --all-groups
+
+      - name: Verify installed tools
+        run: |
+          uv run ruff --version
+          uv run black --version
+          uv run mypy --version
+          uv run pytest --version
 
       - name: Lint with Ruff
         run: uv run ruff check .
@@ -76,15 +83,16 @@ jobs:
           EMAIL_FROM: test@example.com
           SMTP_USE_TLS: "true"
         run: |
-          uv run pytest tests/ \
+          mkdir -p reports
+          uv run pytest tests \
             --tb=short \
             --no-header \
             -q \
             --junit-xml=reports/test-results.xml
 
       - name: Publish test summary
-        uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
+        uses: EnricoMi/publish-unit-test-result-action@v2
         with:
           files: reports/test-results.xml
 
@@ -102,7 +110,6 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Verify Docker Compose builds
-        run: docker compose build --no-cache
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/ai_content_db
           REDIS_URL: redis://redis:6379/0
@@ -116,3 +123,4 @@ jobs:
           SMTP_PASSWORD: testpassword
           EMAIL_FROM: test@example.com
           SMTP_USE_TLS: "true"
+        run: docker compose build --no-cache
