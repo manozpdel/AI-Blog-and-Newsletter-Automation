@@ -25,15 +25,9 @@ dependencies = [
     "httpx>=0.28.1",
 ]
 
+# REMOVE this section entirely (or keep it empty)
 [project.optional-dependencies]
-dev = [
-    "pytest>=8.0.0",
-    "pytest-asyncio>=0.23.0",
-    "ruff>=0.4.0",
-    "black>=24.0.0",
-    "mypy>=1.10.0",
-    "types-redis>=4.6.0",
-]
+dev = []  # Or remove this line completely
 
 [tool.uv]
 package = false
@@ -84,6 +78,7 @@ exclude = [
     "tests/",
     ".venv/",
 ]
+
 # ── Pytest ────────────────────────────────────────────────────
 [tool.pytest.ini_options]
 testpaths = ["tests"]
