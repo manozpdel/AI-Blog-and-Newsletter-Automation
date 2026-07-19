@@ -39,20 +39,20 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Cache uv
+      - name: Cache uv downloads
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.cache/uv
-            .venv
-          key: uv-${{ runner.os }}-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('uv.lock') }}
           restore-keys: |
             uv-${{ runner.os }}-
 
       - name: Install dependencies
-        run: uv sync --all-groups
+        run: |
+          rm -rf .venv
+          uv sync --all-groups
 
-      - name: Verify tools
+      - name: Verify installed tools
         run: |
           uv run ruff --version
           uv run black --version
@@ -84,7 +84,7 @@ jobs:
           SMTP_USE_TLS: "true"
         run: |
           mkdir -p reports
-          uv run pytest tests/ \
+          uv run pytest tests \
             --tb=short \
             --no-header \
             -q \
